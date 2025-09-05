@@ -10,9 +10,8 @@ function WebcamComponent({ isActive, onToggle }: WebcamComponentProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Camera management - turns device camera on/off based on isActive
+  // Camera management
   useEffect(() => {
     if (isActive && !isStreaming) {
       startCamera();
@@ -21,7 +20,7 @@ function WebcamComponent({ isActive, onToggle }: WebcamComponentProps) {
     }
   }, [isActive, isStreaming]);
 
-  // Cleanup on unmount - always stop camera when component unmounts
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopCamera();
@@ -29,9 +28,7 @@ function WebcamComponent({ isActive, onToggle }: WebcamComponentProps) {
   }, []);
 
   const startCamera = async () => {
-    setIsLoading(true);
     try {
-      // Request camera access - this turns ON the device camera
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 640, min: 480 },
@@ -41,48 +38,28 @@ function WebcamComponent({ isActive, onToggle }: WebcamComponentProps) {
         audio: false,
       });
       
-      // Store the stream reference
       streamRef.current = stream;
-      
-      // Attach stream to video element
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
       
       setIsStreaming(true);
       
-      // Set up track event listeners
-      const [track] = stream.getVideoTracks();
-      if (track) {
-        track.addEventListener("ended", () => {
-          setIsStreaming(false);
-        });
-      }
-      
     } catch (error) {
       console.error("Error accessing camera:", error);
       setIsStreaming(false);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const stopCamera = () => {
-    // Stop all tracks - this turns OFF the device camera
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => {
-        track.stop(); // This releases the camera hardware
-      });
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
-    
-    // Clear video element
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    
     setIsStreaming(false);
-    setIsLoading(false);
   };
 
   return (
@@ -92,29 +69,27 @@ function WebcamComponent({ isActive, onToggle }: WebcamComponentProps) {
         className="relative w-full"
         style={{
           aspectRatio: "4/3",
-          maxHeight: "180px",
+          maxHeight: "180px", // Increased from 120px to 180px
           height: "180px"
         }}
       >
         {isActive && isStreaming ? (
-          // Camera is ON and streaming
           <video
             ref={videoRef}
             autoPlay
             muted
             playsInline
             className="w-full h-full object-cover rounded-lg border border-white/20 bg-black"
+            style={{ transform: "scaleX(-1)" }} // This flips the video horizontally
           />
-        ) : isActive && isLoading ? (
-          // Camera is turning ON
+        ) : isActive && !isStreaming ? (
           <div className="w-full h-full rounded-lg border border-white/20 bg-black/80 flex items-center justify-center">
             <div className="text-white/60 text-sm text-center">
-              <div className="mb-2">Starting Camera...</div>
-              <div className="text-xs opacity-75">Please allow camera access</div>
+              <div className="mb-2">Connecting...</div>
+              <div className="text-xs opacity-75">Starting camera feed</div>
             </div>
           </div>
         ) : (
-          // Camera is OFF
           <div className="w-full h-full rounded-lg border border-white/20 bg-black/50 flex items-center justify-center">
             <div className="text-white/60 text-sm text-center">
               <CameraOff className="w-8 h-8 mx-auto mb-2 text-white/40" />
