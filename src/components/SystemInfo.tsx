@@ -1,30 +1,133 @@
 import React, { useEffect, useState } from 'react';
-import { Cpu, HardDrive, Router, Camera, CameraOff, Database, Activity } from 'lucide-react';
+import { Cpu, HardDrive, Router, Camera, CameraOff, Database, Activity, LucideIcon } from 'lucide-react';
 import Weather from './Weather';
 import WebcamComponent from './WebcamComponent';
 
 interface SystemInfoProps {
-  systemData: any;
   side: 'left' | 'right';
 }
 
-const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
-  // Add camera state management
-  const [isCameraActive, setIsCameraActive] = useState(true);
+interface CpuData {
+  cores: number;
+  threads: number;
+  base_speed_ghz: number;
+  current_speed_ghz: number;
+  usage_percent: number;
+}
 
-  const handleCameraToggle = () => {
+interface RamData {
+  used_gb: number;
+  total_gb: number;
+  available_gb: number;
+}
+
+interface DiskData {
+  used_gb: number;
+  total_gb: number;
+}
+
+interface NetworkData {
+  local_ip: string;
+  public_ip: string;
+  bytes_sent_mb: number;
+  bytes_recv_mb: number;
+  interfaces: string[];
+}
+
+interface SpeedData {
+  download_mbps: number;
+  upload_mbps: number;
+}
+
+interface SystemData {
+  cpu: CpuData;
+  ram: RamData;
+  disks: {
+    "C:": DiskData;
+    "D:": DiskData;
+  };
+  network: NetworkData;
+  network_id: string;
+  signal_strength: string;
+  speed: SpeedData;
+}
+
+type AnimationType = 'spin' | 'pulse' | 'bounce' | 'wave' | 'focus' | 'sweep' | 'float' | 'glow';
+type ColorKey = 'green' | 'blue' | 'purple' | 'cyan' | 'emerald' | 'teal' | 'yellow' | 'red';
+
+interface AnimatedIconProps {
+  icon: LucideIcon;
+  animationType?: AnimationType;
+  size?: number;
+  className?: string;
+  color?: string;
+  onClick?: () => void;
+}
+
+interface CircularProgressBarProps {
+  value: number;
+  max: number;
+  color?: ColorKey;
+  size?: number;
+  strokeWidth?: number;
+  label?: string;
+  animate?: boolean;
+  showValue?: boolean;
+}
+
+interface EnhancedBoxProps {
+  children: React.ReactNode;
+  title: string;
+  icon: LucideIcon;
+  animationType?: AnimationType;
+  className?: string;
+  isCompact?: boolean;
+  onIconClick?: () => void;
+}
+
+const SystemInfo: React.FC<SystemInfoProps> = ({ side }) => {
+  // System data with proper typing - moved from App component
+  const systemData: SystemData = {
+    cpu: { 
+      cores: 8, 
+      threads: 16, 
+      base_speed_ghz: 3.2, 
+      current_speed_ghz: 3.8, 
+      usage_percent: 45 
+    },
+    ram: { 
+      used_gb: 8.5, 
+      total_gb: 16, 
+      available_gb: 7.5 
+    },
+    disks: { 
+      "C:": { used_gb: 180, total_gb: 250 }, 
+      "D:": { used_gb: 320, total_gb: 500 } 
+    },
+    network: { 
+      local_ip: '192.168.1.100', 
+      public_ip: '203.0.113.100', 
+      bytes_sent_mb: 1250, 
+      bytes_recv_mb: 3800, 
+      interfaces: ['WiFi', 'Ethernet'] 
+    },
+    network_id: 'STARK_IND', 
+    signal_strength: '98%', 
+    speed: { 
+      download_mbps: 150.5, 
+      upload_mbps: 45.2 
+    }
+  };
+
+  // Add camera state management
+  const [isCameraActive, setIsCameraActive] = useState<boolean>(true);
+
+  const handleCameraToggle = (): void => {
     setIsCameraActive(!isCameraActive);
   };
 
   // Animated Icon Wrapper Component
-  const AnimatedIcon: React.FC<{
-    icon: React.ComponentType<any>;
-    animationType?: 'spin' | 'pulse' | 'bounce' | 'wave' | 'focus' | 'sweep' | 'float' | 'glow';
-    size?: number;
-    className?: string;
-    color?: string;
-    onClick?: () => void;
-  }> = ({ 
+  const AnimatedIcon: React.FC<AnimatedIconProps> = ({ 
     icon: Icon, 
     animationType = 'pulse', 
     size, 
@@ -32,7 +135,7 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
     color,
     onClick
   }) => {
-    const getAnimationClass = () => {
+    const getAnimationClass = (): string => {
       switch (animationType) {
         case 'spin':
           return 'animate-spin-slow';
@@ -69,9 +172,7 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
   };
 
   // Circular Progress Bar Component
-  type ColorKey = 'green' | 'blue' | 'purple' | 'cyan' | 'emerald' | 'teal' | 'yellow' | 'red';
-  
-  const CircularProgressBar = ({ 
+  const CircularProgressBar: React.FC<CircularProgressBarProps> = ({ 
     value, 
     max, 
     color = 'green',
@@ -80,17 +181,8 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
     label = '',
     animate = true,
     showValue = false
-  }: { 
-    value: number; 
-    max: number; 
-    color?: ColorKey; 
-    size?: number;
-    strokeWidth?: number;
-    label?: string;
-    animate?: boolean;
-    showValue?: boolean;
   }) => {
-    const [animatedPercentage, setAnimatedPercentage] = useState(0);
+    const [animatedPercentage, setAnimatedPercentage] = useState<number>(0);
     
     const actualPercentage = Math.min(Math.max((value / max) * 100, 0), 100);
     
@@ -174,7 +266,7 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
   };
 
   // Enhanced Box Component
-  const EnhancedBox = ({ 
+  const EnhancedBox: React.FC<EnhancedBoxProps> = ({ 
     children, 
     title, 
     icon: Icon,
@@ -182,14 +274,6 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
     className = '',
     isCompact = false,
     onIconClick
-  }: { 
-    children: React.ReactNode; 
-    title: string; 
-    icon: any;
-    animationType?: 'spin' | 'pulse' | 'bounce' | 'wave' | 'focus' | 'sweep' | 'float' | 'glow';
-    className?: string;
-    isCompact?: boolean;
-    onIconClick?: () => void;
   }) => {
     return (
       <div className={`
@@ -237,19 +321,19 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
   };
 
   // LEFT PANEL - COMPACT SYSTEM INFORMATION + WEATHER
-  const leftPanelData = (
+  const leftPanelData: JSX.Element = (
     <>
       <EnhancedBox title="CPU CORE" icon={Cpu} animationType="spin" isCompact>
         <div className="flex items-center justify-between gap-2">
           <div className="flex-1 grid grid-cols-2 gap-1 text-xs text-white/90">
-            <span>Cores: <span className="text-white font-semibold">{systemData.cpu?.cores || 8}</span></span>
-            <span>Threads: <span className="text-white font-semibold">{systemData.cpu?.threads || 16}</span></span>
-            <span>Base: <span className="text-white font-semibold">{(systemData.cpu?.base_speed_ghz || 3.2).toFixed(1)}GHz</span></span>
-            <span>Current: <span className="text-white font-semibold">{(systemData.cpu?.current_speed_ghz || 3.8).toFixed(1)}GHz</span></span>
+            <span>Cores: <span className="text-white font-semibold">{systemData.cpu.cores}</span></span>
+            <span>Threads: <span className="text-white font-semibold">{systemData.cpu.threads}</span></span>
+            <span>Base: <span className="text-white font-semibold">{systemData.cpu.base_speed_ghz.toFixed(1)}GHz</span></span>
+            <span>Current: <span className="text-white font-semibold">{systemData.cpu.current_speed_ghz.toFixed(1)}GHz</span></span>
           </div>
           <div className="flex-shrink-0">
             <CircularProgressBar 
-              value={systemData.cpu?.usage_percent || 45} 
+              value={systemData.cpu.usage_percent} 
               max={100} 
               color="emerald"
               size={45}
@@ -264,17 +348,17 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
           <div className="flex-1 space-y-1 text-xs text-white/90">
             <div>
               <span>Used: <span className="text-white font-semibold">
-                {(systemData.ram?.used_gb || 8.5).toFixed(1)}GB / {(systemData.ram?.total_gb || 16).toFixed(0)}GB
+                {systemData.ram.used_gb.toFixed(1)}GB / {systemData.ram.total_gb.toFixed(0)}GB
               </span></span>
             </div>
             <span className="text-xs text-white/70">
-              Available: <span className="text-white">{(systemData.ram?.available_gb || 7.5).toFixed(1)}GB</span>
+              Available: <span className="text-white">{systemData.ram.available_gb.toFixed(1)}GB</span>
             </span>
           </div>
           <div className="flex-shrink-0">
             <CircularProgressBar 
-              value={systemData.ram?.used_gb || 8.5} 
-              max={systemData.ram?.total_gb || 16} 
+              value={systemData.ram.used_gb} 
+              max={systemData.ram.total_gb} 
               color="blue"
               size={45}
               strokeWidth={4}
@@ -288,19 +372,19 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
           <div className="flex-1 space-y-0.5 text-xs text-white/90">
             <div>
               <span>C:\ <span className="text-white font-semibold">
-                {(systemData.disks?.["C:"]?.used_gb || 180).toFixed(0)}GB / {(systemData.disks?.["C:"]?.total_gb || 250).toFixed(0)}GB
+                {systemData.disks["C:"].used_gb.toFixed(0)}GB / {systemData.disks["C:"].total_gb.toFixed(0)}GB
               </span></span>
             </div>
             <span className="text-xs text-white/70">
               Free: <span className="text-white">
-                {((systemData.disks?.["C:"]?.total_gb || 250) - (systemData.disks?.["C:"]?.used_gb || 180)).toFixed(0)}GB
+                {(systemData.disks["C:"].total_gb - systemData.disks["C:"].used_gb).toFixed(0)}GB
               </span>
             </span>
           </div>
           <div className="flex-shrink-0">
             <CircularProgressBar 
-              value={systemData.disks?.["C:"]?.used_gb || 180} 
-              max={systemData.disks?.["C:"]?.total_gb || 250} 
+              value={systemData.disks["C:"].used_gb} 
+              max={systemData.disks["C:"].total_gb} 
               color="purple"
               size={40}
               strokeWidth={3}
@@ -312,19 +396,19 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
           <div className="flex-1 space-y-0.5 text-xs text-white/90">
             <div>
               <span>D:\ <span className="text-white font-semibold">
-                {(systemData.disks?.["D:"]?.used_gb || 320).toFixed(0)}GB / {(systemData.disks?.["D:"]?.total_gb || 500).toFixed(0)}GB
+                {systemData.disks["D:"].used_gb.toFixed(0)}GB / {systemData.disks["D:"].total_gb.toFixed(0)}GB
               </span></span>
             </div>
             <span className="text-xs text-white/70">
               Free: <span className="text-white">
-                {((systemData.disks?.["D:"]?.total_gb || 500) - (systemData.disks?.["D:"]?.used_gb || 320)).toFixed(0)}GB
+                {(systemData.disks["D:"].total_gb - systemData.disks["D:"].used_gb).toFixed(0)}GB
               </span>
             </span>
           </div>
           <div className="flex-shrink-0">
             <CircularProgressBar 
-              value={systemData.disks?.["D:"]?.used_gb || 320} 
-              max={systemData.disks?.["D:"]?.total_gb || 500} 
+              value={systemData.disks["D:"].used_gb} 
+              max={systemData.disks["D:"].total_gb} 
               color="teal"
               size={40}
               strokeWidth={3}
@@ -336,8 +420,8 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-white/80 font-medium">Total Storage</span>
             <span className="text-white font-semibold text-xs">
-              {((systemData.disks?.["C:"]?.used_gb || 180) + (systemData.disks?.["D:"]?.used_gb || 320)).toFixed(0)}GB / 
-              {((systemData.disks?.["C:"]?.total_gb || 250) + (systemData.disks?.["D:"]?.total_gb || 500)).toFixed(0)}GB
+              {(systemData.disks["C:"].used_gb + systemData.disks["D:"].used_gb).toFixed(0)}GB / 
+              {(systemData.disks["C:"].total_gb + systemData.disks["D:"].total_gb).toFixed(0)}GB
             </span>
           </div>
           
@@ -346,21 +430,21 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
               <div>
                 <span className="text-xs text-white/70">Used:</span>
                 <div className="text-white font-semibold text-xs">
-                  {((systemData.disks?.["C:"]?.used_gb || 180) + (systemData.disks?.["D:"]?.used_gb || 320)).toFixed(0)}GB
+                  {(systemData.disks["C:"].used_gb + systemData.disks["D:"].used_gb).toFixed(0)}GB
                 </div>
               </div>
               <div>
                 <span className="text-xs text-white/70">Free:</span>
                 <div className="text-white font-semibold text-xs">
-                  {(((systemData.disks?.["C:"]?.total_gb || 250) + (systemData.disks?.["D:"]?.total_gb || 500)) - 
-                    ((systemData.disks?.["C:"]?.used_gb || 180) + (systemData.disks?.["D:"]?.used_gb || 320))).toFixed(0)}GB
+                  {((systemData.disks["C:"].total_gb + systemData.disks["D:"].total_gb) - 
+                    (systemData.disks["C:"].used_gb + systemData.disks["D:"].used_gb)).toFixed(0)}GB
                 </div>
               </div>
             </div>
             <div className="flex-shrink-0">
               <CircularProgressBar 
-                value={(systemData.disks?.["C:"]?.used_gb || 180) + (systemData.disks?.["D:"]?.used_gb || 320)} 
-                max={(systemData.disks?.["C:"]?.total_gb || 250) + (systemData.disks?.["D:"]?.total_gb || 500)} 
+                value={systemData.disks["C:"].used_gb + systemData.disks["D:"].used_gb} 
+                max={systemData.disks["C:"].total_gb + systemData.disks["D:"].total_gb} 
                 color="cyan"
                 size={45}
                 strokeWidth={4}
@@ -376,30 +460,30 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
   );
 
   // RIGHT PANEL - NETWORK INFORMATION + VISUAL FEED UI
-  const rightPanelData = (
+  const rightPanelData: JSX.Element = (
     <>
       <EnhancedBox title="NETWORK STATUS" icon={Router} animationType="wave" isCompact>
         <div className="grid grid-cols-1 gap-2 text-xs text-white/90">
           <div className="space-y-1">
             <span className="text-xs text-white/70">Local IP:</span>
             <div className="text-white font-mono text-xs bg-white/10 px-2 py-1 rounded border border-white/20 break-all">
-              {systemData.network?.local_ip || '192.168.1.100'}
+              {systemData.network.local_ip}
             </div>
           </div>
           <div className="space-y-1">
             <span className="text-xs text-white/70">Public IP:</span>
             <div className="text-white font-mono text-xs bg-white/10 px-2 py-1 rounded border border-white/20 break-all">
-              {systemData.network?.public_ip || '203.0.113.100'}
+              {systemData.network.public_ip}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <span className="text-xs text-white/70">Network:</span>
-              <div className="text-white font-semibold text-xs">{systemData.network_id || 'STARK_IND'}</div>
+              <div className="text-white font-semibold text-xs">{systemData.network_id}</div>
             </div>
             <div>
               <span className="text-xs text-white/70">Signal:</span>
-              <div className="text-white font-semibold text-xs">{systemData.signal_strength || '98%'}</div>
+              <div className="text-white font-semibold text-xs">{systemData.signal_strength}</div>
             </div>
           </div>
         </div>
@@ -410,13 +494,13 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1 grid grid-cols-2 gap-1 text-xs text-white/90">
               <span className="text-xs text-white/70">↓ Download:</span>
-              <span className="text-white font-semibold text-xs">{(systemData.speed?.download_mbps || 150.5).toFixed(0)} Mbps</span>
+              <span className="text-white font-semibold text-xs">{systemData.speed.download_mbps.toFixed(0)} Mbps</span>
               <span className="text-xs text-white/70">↑ Upload:</span>
-              <span className="text-white font-semibold text-xs">{(systemData.speed?.upload_mbps || 45.2).toFixed(0)} Mbps</span>
+              <span className="text-white font-semibold text-xs">{systemData.speed.upload_mbps.toFixed(0)} Mbps</span>
             </div>
             <div className="flex-shrink-0">
               <CircularProgressBar 
-                value={systemData.speed?.download_mbps || 150.5} 
+                value={systemData.speed.download_mbps} 
                 max={1000}
                 color="emerald"
                 size={45}
@@ -429,13 +513,13 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
             <div className="flex items-center justify-between gap-2">
               <div className="flex-1 grid grid-cols-2 gap-1 text-xs text-white/90">
                 <span className="text-xs text-white/70">Sent:</span>
-                <span className="text-white font-semibold text-xs">{(systemData.network?.bytes_sent_mb || 1250).toFixed(0)}MB</span>
+                <span className="text-white font-semibold text-xs">{systemData.network.bytes_sent_mb.toFixed(0)}MB</span>
                 <span className="text-xs text-white/70">Received:</span>
-                <span className="text-white font-semibold text-xs">{(systemData.network?.bytes_recv_mb || 3800).toFixed(0)}MB</span>
+                <span className="text-white font-semibold text-xs">{systemData.network.bytes_recv_mb.toFixed(0)}MB</span>
               </div>
               <div className="flex-shrink-0">
                 <CircularProgressBar 
-                  value={((systemData.network?.bytes_sent_mb || 1250) + (systemData.network?.bytes_recv_mb || 3800))} 
+                  value={systemData.network.bytes_sent_mb + systemData.network.bytes_recv_mb} 
                   max={10000}
                   color="cyan"
                   size={40}
@@ -446,7 +530,7 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ systemData, side }) => {
             
             <div className="text-xs text-white/70 mt-2">
               <span>Interfaces: </span>
-              <span className="text-white text-xs break-words">{systemData.network?.interfaces?.join(', ') || 'WiFi, Ethernet'}</span>
+              <span className="text-white text-xs break-words">{systemData.network.interfaces.join(', ')}</span>
             </div>
           </div>
         </div>

@@ -1,18 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Renderer, Program, Mesh, Triangle, Vec3 } from 'ogl';
-import picoImage from '../pico.png'; // Import the pico image
+import picoImage from '../assets/pico.png';
 
 interface PicoLogoProps {
-  state: 'trying' | 'connected' | 'cannot' | 'idle' | 'listening' | 'thinking' | 'preparing';
-  onStateChange: (state: 'trying' | 'connected' | 'cannot' | 'idle' | 'listening' | 'thinking' | 'preparing') => void;
+  state?: 'idle' | 'listening' | 'thinking' | 'preparing';
+  onStateChange?: (state: 'idle' | 'listening' | 'thinking' | 'preparing') => void;
 }
 
-const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
+const PicoLogo: React.FC<PicoLogoProps> = ({ 
+  state = 'idle', 
+  onStateChange = () => {} 
+}) => {
   const ctnDom = useRef<HTMLDivElement>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [audioData, setAudioData] = useState<number[]>([0, 0, 0, 0, 0]);
   
-  // New states for picture feature
+  // Picture feature states
   const [showPicture, setShowPicture] = useState(false);
   const [pictureSrc, setPictureSrc] = useState<string | null>(null);
   const [pictureOpacity, setPictureOpacity] = useState(0);
@@ -128,10 +131,7 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
       }
     };
 
-    // Only start microphone for non-connection states
-    if (!['trying', 'connected', 'cannot'].includes(state)) {
-      startMicrophone();
-    }
+    startMicrophone();
 
     return () => {
       if (animationRef.current) {
@@ -143,9 +143,8 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
     };
   }, [state]);
 
-  // Picture generation simulation - only when idle and connected
+  // Picture generation simulation - every 1 minute
   useEffect(() => {
-    // Only generate pictures when in idle state (after successful connection)
     if (state !== 'idle') return;
 
     const generatePicture = () => {
@@ -165,8 +164,8 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
       }, 15000);
     };
 
-    const intervalId = setInterval(generatePicture, 25000);
-    const timeoutId = setTimeout(generatePicture, 5000);
+    const intervalId = setInterval(generatePicture, 60000); // Changed to 1 minute
+    const timeoutId = setTimeout(generatePicture, 60000); // Changed to 1 minute
 
     return () => {
       clearInterval(intervalId);
@@ -174,10 +173,8 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
     };
   }, [state]);
 
-  // State changes simulation (only for normal operation states)
+  // State changes simulation - every 10 seconds
   useEffect(() => {
-    if (['trying', 'connected', 'cannot'].includes(state)) return;
-
     const interval = setInterval(() => {
       if (!isAnimating) {
         const states: Array<'idle' | 'listening' | 'thinking' | 'preparing'> = ['listening', 'thinking', 'preparing', 'idle'];
@@ -188,37 +185,13 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
           onStateChange('idle');
         }, 4000);
       }
-    }, 10000);
+    }, 10000); // 10 seconds
 
     return () => clearInterval(interval);
   }, [onStateChange, isAnimating, state]);
 
   const getStateConfig = () => {
     switch (state) {
-      case 'trying':
-        return { 
-          hue: 200,
-          hoverIntensity: 0.6,
-          text: 'pico is trying to connect', 
-          color: '#3498db',
-          glow: 'rgba(52, 152, 219, 0.8)'
-        };
-      case 'connected':
-        return { 
-          hue: 120,
-          hoverIntensity: 0.3,
-          text: 'pico is connected', 
-          color: '#2ecc71',
-          glow: 'rgba(46, 204, 113, 0.8)'
-        };
-      case 'cannot':
-        return { 
-          hue: 0,
-          hoverIntensity: 0.7,
-          text: 'pico cannot connect', 
-          color: '#e74c3c',
-          glow: 'rgba(231, 76, 60, 0.8)'
-        };
       case 'listening':
         return { 
           hue: 60,
@@ -434,10 +407,8 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
     }
   `;
 
-  // WebGL setup effect - UPDATED: Only for operational states (not connection states)
+  // WebGL setup effect
   useEffect(() => {
-    if (['trying', 'connected', 'cannot'].includes(state)) return; // Don't render WebGL for connection states
-
     const container = ctnDom.current;
     if (!container) return;
 
@@ -479,6 +450,7 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
     let targetHover = 0;
     let currentRot = 0;
     const rotationSpeed = 0.3;
+    let lastState = state; // Track previous state
 
     const handleMouseMove = (e: MouseEvent) => {
       const rect = container.getBoundingClientRect();
@@ -515,24 +487,32 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
       rafId = requestAnimationFrame(update);
       const dt = (t - lastTime) * 0.001;
       lastTime = t;
-      const config = getStateConfig();
       
+      // Always update time-based uniforms
       program.uniforms.iTime.value = t * 0.001;
       
-      const currentHue = program.uniforms.hue.value;
-      const targetHue = config.hue;
-      let hueDiff = targetHue - currentHue;
+      // Only update color-related uniforms when state changes
+      if (lastState !== state) {
+        const config = getStateConfig();
+        
+        const currentHue = program.uniforms.hue.value;
+        const targetHue = config.hue;
+        let hueDiff = targetHue - currentHue;
+        
+        if (hueDiff > 180) hueDiff -= 360;
+        if (hueDiff < -180) hueDiff += 360;
+        
+        program.uniforms.hue.value = currentHue + hueDiff * 0.008;
+        if (program.uniforms.hue.value < 0) program.uniforms.hue.value += 360;
+        if (program.uniforms.hue.value >= 360) program.uniforms.hue.value -= 360;
+        
+        program.uniforms.hoverIntensity.value = config.hoverIntensity;
+        
+        lastState = state; // Update tracked state
+      }
       
-      if (hueDiff > 180) hueDiff -= 360;
-      if (hueDiff < -180) hueDiff += 360;
-      
-      program.uniforms.hue.value = currentHue + hueDiff * 0.008;
-      if (program.uniforms.hue.value < 0) program.uniforms.hue.value += 360;
-      if (program.uniforms.hue.value >= 360) program.uniforms.hue.value -= 360;
-      
-      program.uniforms.hoverIntensity.value += (config.hoverIntensity - program.uniforms.hoverIntensity.value) * 0.05;
-      
-      const effectiveHover = (!['idle', 'trying'].includes(state)) ? 1 : targetHover;
+      // Continue with other animations that should always update
+      const effectiveHover = (state !== 'idle') ? 1 : targetHover;
       program.uniforms.hover.value += (effectiveHover - program.uniforms.hover.value) * 0.08;
       
       if (effectiveHover > 0.5) {
@@ -540,8 +520,9 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
       }
       program.uniforms.rot.value = currentRot;
       
-      const targetAnimation = (!['idle', 'trying'].includes(state)) ? 1.0 : 0.0;
+      const targetAnimation = (state !== 'idle') ? 1.0 : 0.0;
       program.uniforms.stateAnimation.value += (targetAnimation - program.uniforms.stateAnimation.value) * 0.06;
+      
       renderer.render({ scene: mesh });
     };
 
@@ -564,59 +545,17 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
 
   return (
     <div className="flex flex-col items-center justify-start space-y-8 p-4 pt-8 relative">
-      {/* Connection States Display - UPDATED: Clean red filter for cannot state */}
-      {['trying', 'connected', 'cannot'].includes(state) && (
-        <div className="w-96 h-96 flex items-center justify-center">
-          <div className="relative">
-            <img
-              src={picoImage}
-              alt={`Pico ${state}`}
-              className="w-64 h-64 object-contain"
-              style={{
-                animation: state === 'trying' ? 'connectingAnimation 2s ease-in-out infinite' : 
-                          state === 'connected' ? 'connectedAnimation 3s ease-in-out infinite' :
-                          'cannotConnectAnimation 2s ease-in-out infinite',
-                // UPDATED: Clean red tint for cannot state, similar to connected state approach
-                filter: state === 'cannot' 
-                  ? `sepia(1) hue-rotate(320deg) saturate(1.8) brightness(1.1) drop-shadow(0 0 30px ${config.glow})`
-                  : `drop-shadow(0 0 30px ${config.glow}) brightness(1.1)`,
-              }}
-            />
-
-            {/* Success glow for connected state */}
-            {state === 'connected' && (
-              <div
-                className="absolute inset-0 rounded-full"
-              />
-            )}
-
-            {/* Error indicator for cannot connect state */}
-            {state === 'cannot' && (
-              <div
-                className=""
-                style={{
-                  borderColor: config.color,
-                  animation: 'errorPulse 1.5s ease-in-out infinite',
-                }}
-              />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* WebGL Logo Container (only for operational states) */}
-      {!['trying', 'connected', 'cannot'].includes(state) && (
-        <div 
-          ref={ctnDom} 
-          className="w-96 h-96 relative transition-all duration-[2000ms] ease-out cursor-pointer"
-          style={{
-            filter: !['idle', 'trying'].includes(state)
-              ? `drop-shadow(0 0 40px ${config.glow}) drop-shadow(0 0 80px ${config.glow}) brightness(1.1)`
-              : `drop-shadow(0 0 30px ${config.glow}) brightness(1.0)`,
-            transform: !['idle', 'trying'].includes(state) ? 'scale(1.02)' : 'scale(1.0)',
-          }}
-        />
-      )}
+      {/* WebGL Logo Container */}
+      <div 
+        ref={ctnDom} 
+        className="w-96 h-96 relative transition-all duration-[2000ms] ease-out cursor-pointer"
+        style={{
+          filter: state !== 'idle'
+            ? `drop-shadow(0 0 40px ${config.glow}) drop-shadow(0 0 80px ${config.glow}) brightness(1.1)`
+            : `drop-shadow(0 0 30px ${config.glow}) brightness(1.0)`,
+          transform: state !== 'idle' ? 'scale(1.02)' : 'scale(1.0)',
+        }}
+      />
 
       {/* Generated Picture Overlay (only when idle) */}
       {showPicture && pictureSrc && state === 'idle' && (
@@ -705,10 +644,10 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
           className="text-2xl font-bold transition-all duration-[1500ms] ease-in-out tracking-wide"
           style={{ 
             color: config.color,
-            textShadow: !['idle', 'trying'].includes(state)
+            textShadow: state !== 'idle'
               ? `0 0 15px ${config.glow}, 0 0 30px ${config.glow}` 
               : `0 0 10px ${config.glow}`,
-            transform: !['idle', 'trying'].includes(state) ? 'translateY(-2px)' : 'translateY(0px)',
+            transform: state !== 'idle' ? 'translateY(-2px)' : 'translateY(0px)',
           }}
         >
           {config.text}
@@ -738,12 +677,12 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
                 className="w-2 h-2 rounded-full transition-all duration-[1200ms] ease-in-out"
                 style={{ 
                   backgroundColor: config.color,
-                  opacity: !['idle', 'trying'].includes(state) ? '1.0' : '0.6',
-                  transform: !['idle', 'trying'].includes(state) ? 'scale(1.3)' : 'scale(1.0)',
-                  boxShadow: !['idle', 'trying'].includes(state)
+                  opacity: state !== 'idle' ? '1.0' : '0.6',
+                  transform: state !== 'idle' ? 'scale(1.3)' : 'scale(1.0)',
+                  boxShadow: state !== 'idle'
                     ? `0 0 10px ${config.glow}` 
                     : `0 0 5px ${config.glow}`,
-                  animation: !['idle', 'trying'].includes(state)
+                  animation: state !== 'idle'
                     ? `orbPulse 2s ease-in-out infinite ${i * 0.3}s`
                     : 'none',
                 }}
@@ -773,85 +712,264 @@ const PicoLogo: React.FC<PicoLogoProps> = ({ state, onStateChange }) => {
             transform: scaleY(1.5); 
           }
         }
-
-        @keyframes connectingAnimation {
-          0%, 100% {
-            transform: scale(1) rotate(0deg);
-            opacity: 0.8;
-          }
-          25% {
-            transform: scale(1.05) rotate(2deg);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1.1) rotate(0deg);
-            opacity: 0.9;
-          }
-          75% {
-            transform: scale(1.05) rotate(-2deg);
-            opacity: 1;
-          }
-        }
-
-        @keyframes connectedAnimation {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1.02);
-            opacity: 0.95;
-          }
-        }
-
-        @keyframes cannotConnectAnimation {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 0.9;
-          }
-          25% {
-            transform: scale(0.98) rotate(-1deg);
-            opacity: 1;
-          }
-          75% {
-            transform: scale(0.98) rotate(1deg);
-            opacity: 1;
-          }
-        }
-
-        @keyframes pulseRing {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 0.3;
-          }
-          50% {
-            transform: scale(1.2);
-            opacity: 0.1;
-          }
-        }
-
-        @keyframes successGlow {
-          0%, 100% {
-            opacity: 0.6;
-          }
-          50% {
-            opacity: 0.9;
-          }
-        }
-
-        @keyframes errorPulse {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 0.7;
-          }
-          50% {
-            transform: scale(1.05);
-            opacity: 1;
-          }
-        }
       `}</style>
     </div>
   );
 };
 
 export default PicoLogo;
+
+
+// import React, { useEffect, useRef, useState } from 'react';
+// import { Renderer, Program, Mesh, Triangle, Vec3 } from 'ogl';
+// import picoImage from '../assets/pico.png';
+
+// interface PicoLogoProps {
+//   state?: 'idle' | 'listening' | 'thinking' | 'preparing';
+//   onStateChange?: (state: 'idle' | 'listening' | 'thinking' | 'preparing') => void;
+// }
+
+// const PicoLogo: React.FC<PicoLogoProps> = ({ 
+//   state = 'idle', 
+//   onStateChange = () => {} 
+// }) => {
+//   const ctnDom = useRef<HTMLDivElement>(null);
+
+//   const getStateConfig = () => {
+//     switch (state) {
+//       case 'listening':
+//         return { 
+//           hue: 60,
+//           hoverIntensity: 0.4,
+//           text: 'Pico is listening...', 
+//           color: '#9C4DFF',
+//           glow: 'rgba(156, 77, 255, 0.8)'
+//         };
+//       case 'thinking':
+//         return { 
+//           hue: 180,
+//           hoverIntensity: 0.3,
+//           text: 'Pico is thinking...', 
+//           color: '#4CBEE9',
+//           glow: 'rgba(76, 190, 233, 0.8)'
+//         };
+//       case 'preparing':
+//         return { 
+//           hue: 300,
+//           hoverIntensity: 0.5,
+//           text: 'Pico is preparing...', 
+//           color: '#1e70ffff',
+//           glow: 'rgba(77, 119, 255, 0.8)'
+//         };
+//       default:
+//         return { 
+//           hue: 0,
+//           hoverIntensity: 0.2,
+//           text: 'Pico is idle...', 
+//           color: '#9C4DFF',
+//           glow: 'rgba(156, 77, 255, 0.6)'
+//         };
+//     }
+//   };
+
+//   // WebGL shader code
+//   const vert = /* glsl */ `
+//     precision highp float;
+//     attribute vec2 position;
+//     attribute vec2 uv;
+//     varying vec2 vUv;
+//     void main() {
+//       vUv = uv;
+//       gl_Position = vec4(position, 0.0, 1.0);
+//     }
+//   `;
+
+//   const frag = /* glsl */ `
+//     precision highp float;
+//     uniform vec3 iResolution;
+//     uniform float hue;
+//     uniform float time;
+//     varying vec2 vUv;
+
+//     // HSV to RGB conversion
+//     vec3 hsv2rgb(vec3 c) {
+//       vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+//       vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+//       return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+//     }
+
+//     vec4 createSphere(vec2 uv) {
+//       float dist = length(uv);
+      
+//       // Create sphere boundary
+//       float sphere = 1.0 - smoothstep(0.35, 0.4, dist);
+      
+//       // Create inner gradient for 3D effect
+//       float centerGlow = 1.0 - smoothstep(0.0, 0.25, dist);
+//       float midGlow = 1.0 - smoothstep(0.1, 0.35, dist);
+      
+//       // Base blue color (similar to image)
+//       vec3 baseColor = vec3(0.2, 0.6, 1.0);
+      
+//       // Apply hue shift based on state
+//       float normalizedHue = hue / 360.0;
+//       vec3 shiftedColor = hsv2rgb(vec3(normalizedHue + 0.6, 0.8, 1.0));
+      
+//       // Blend the colors
+//       vec3 finalColor = mix(baseColor, shiftedColor, 0.3);
+      
+//       // Create gradient from center to edge
+//       float brightness = centerGlow * 1.5 + midGlow * 0.8 + 0.3;
+//       finalColor *= brightness;
+      
+//       // Add some subtle animation based on time
+//       float pulse = sin(time * 2.0) * 0.1 + 1.0;
+//       finalColor *= pulse;
+      
+//       return vec4(finalColor, sphere);
+//     }
+
+//     void main() {
+//       // Convert to centered coordinates
+//       vec2 center = iResolution.xy * 0.5;
+//       float size = min(iResolution.x, iResolution.y) * 0.5;
+//       vec2 uv = (vUv * iResolution.xy - center) / size;
+      
+//       vec4 color = createSphere(uv);
+      
+//       gl_FragColor = color;
+//     }
+//   `;
+
+//   // Animated WebGL setup
+//   useEffect(() => {
+//     const container = ctnDom.current;
+//     if (!container) return;
+
+//     const renderer = new Renderer({ alpha: true, premultipliedAlpha: false });
+//     const gl = renderer.gl;
+//     gl.clearColor(0, 0, 0, 0);
+//     container.appendChild(gl.canvas);
+
+//     const geometry = new Triangle(gl);
+//     const program = new Program(gl, {
+//       vertex: vert,
+//       fragment: frag,
+//       uniforms: {
+//         iResolution: {
+//           value: new Vec3(gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height)
+//         },
+//         hue: { value: 0 },
+//         time: { value: 0 }
+//       }
+//     });
+
+//     const mesh = new Mesh(gl, { geometry, program });
+
+//     function resize() {
+//       if (!container) return;
+//       const dpr = window.devicePixelRatio || 1;
+//       const width = container.clientWidth;
+//       const height = container.clientHeight;
+//       renderer.setSize(width * dpr, height * dpr);
+//       gl.canvas.style.width = width + 'px';
+//       gl.canvas.style.height = height + 'px';
+//       program.uniforms.iResolution.value.set(gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height);
+//     }
+
+//     // Update hue based on state
+//     const config = getStateConfig();
+//     program.uniforms.hue.value = config.hue;
+
+//     window.addEventListener('resize', resize);
+//     resize();
+
+//     // Animation loop
+//     let animationId: number;
+//     const startTime = Date.now();
+    
+//     function animate() {
+//       const currentTime = (Date.now() - startTime) * 0.001; // Convert to seconds
+//       program.uniforms.time.value = currentTime;
+      
+//       renderer.render({ scene: mesh });
+//       animationId = requestAnimationFrame(animate);
+//     }
+    
+//     animate();
+
+//     return () => {
+//       window.removeEventListener('resize', resize);
+//       cancelAnimationFrame(animationId);
+//       if (container.contains(gl.canvas)) {
+//         container.removeChild(gl.canvas);
+//       }
+//       gl.getExtension('WEBGL_lose_context')?.loseContext();
+//     };
+//   }, [state]);
+
+//   const config = getStateConfig();
+
+//   return (
+//     <div className="flex flex-col items-center justify-start space-y-8 p-4 pt-8 relative">
+//       {/* WebGL Logo Container */}
+//       <div 
+//         ref={ctnDom} 
+//         className="w-96 h-96 relative cursor-pointer"
+//         style={{
+//           filter: `drop-shadow(0 0 50px ${config.glow}) drop-shadow(0 0 100px ${config.glow}) brightness(1.2)`
+//         }}
+//       />
+
+//       {/* Status Text and Controls */}
+//       <div className="text-center">
+//         <p 
+//           className="text-2xl font-bold tracking-wide"
+//           style={{ 
+//             color: config.color,
+//             textShadow: `0 0 10px ${config.glow}`
+//           }}
+//         >
+//           {config.text}
+//         </p>
+        
+//         <div className="flex items-center justify-center space-x-3 mt-4">
+//           {state === 'listening' ? (
+//             <div className="flex items-end justify-center space-x-1 h-8">
+//               {[0.3, 0.6, 0.4, 0.8, 0.5].map((amplitude, i) => (
+//                 <div
+//                   key={i}
+//                   className="rounded-t-full"
+//                   style={{
+//                     width: '4px',
+//                     height: `${Math.max(8, amplitude * 32)}px`,
+//                     backgroundColor: config.color,
+//                     boxShadow: `0 0 10px ${config.glow}`
+//                   }}
+//                 />
+//               ))}
+//             </div>
+//           ) : (
+//             [...Array(3)].map((_, i) => (
+//               <div
+//                 key={i}
+//                 className="w-2 h-2 rounded-full"
+//                 style={{ 
+//                   backgroundColor: config.color,
+//                   opacity: state !== 'idle' ? '1.0' : '0.6',
+//                   boxShadow: state !== 'idle'
+//                     ? `0 0 10px ${config.glow}` 
+//                     : `0 0 5px ${config.glow}`
+//                 }}
+//               />
+//             ))
+//           )}
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default PicoLogo;
+
+
